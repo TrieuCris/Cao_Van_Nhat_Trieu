@@ -1,0 +1,127 @@
+{
+  "version": "3.1",
+  "camera": {
+    "index": 0,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "brightness": 17.0,
+    "exposure": -6.0,
+    "auto_exposure": 0,
+    "gain": 0.0,
+    "focus": 1.0,
+    "contrast": 35.0,
+    "saturation": 63.0,
+    "sharpness": 0.0,
+    "gamma": 92.0,
+    "white_balance": 0,
+    "hue": 6.0,
+    "backlight": 0.0
+  },
+  "roi": {
+    "x": 500,
+    "y": 87,
+    "w": 1280,
+    "h": 640
+  },
+  "calibration": {
+    "pixel_origin": "roi",
+    "roi_origin_px": [
+      179,
+      38
+    ],
+    "image_points_roi_px": [
+      [
+        264.0,
+        129.0
+      ],
+      [
+        830.0,
+        129.0
+      ],
+      [
+        830.0,
+        554.0
+      ],
+      [
+        264.0,
+        554.0
+      ]
+    ],
+    "robot_points_mm": [
+      [
+        -20,
+        -135
+      ],
+      [
+        -20,
+        -235
+      ],
+      [
+        -80,
+        -235
+      ],
+      [
+        -80,
+        -135
+      ]
+    ],
+    "homography_pixel_to_robot": []
+  },
+  "distortion": {
+    "camera_matrix": [
+      [
+        2936.118203047593,
+        0.0,
+        945.9965409447905
+      ],
+      [
+        0.0,
+        2946.1300526171503,
+        479.8924103513013
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "dist_coeffs": [
+      [
+        -0.4506277582067406,
+        -0.8562017237476248,
+        -0.001614423750741076,
+        0.0006990956844096414,
+        11.80419867838817
+      ]
+    ],
+    "image_size": [
+      1920,
+      1080
+    ]
+  },
+  "min_object_area": 20000,
+  "max_object_area": 50000,
+  "detection": {
+    "hsv": {
+      "h_min": 0,
+      "h_max": 180,
+      "s_min": 0,
+      "s_max": 70,
+      "v_min": 110,
+      "v_max": 255
+    },
+    "morphology": {
+      "kernel_size": 5,
+      "open_iterations": 1,
+      "close_iterations": 2
+    },
+    "filters": {
+      "min_area": 50000,
+      "min_aspect_ratio": 0.35,
+      "max_aspect_ratio": 1.74
+    }
+  }
+}
