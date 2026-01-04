@@ -109,4 +109,3 @@ CODE/
 *   **Liên hệ:** [Email hoặc thông tin liên hệ của bạn]
 
 ---
-*Dự án được phát triển với sự hỗ trợ của Gemini AI Assistant.*
