@@ -1,0 +1,4 @@
+# Mark STM32 libraries as vendored so they don't skew language stats
+STM32_ROBOTDELTA/Drivers/** linguist-vendored
+STM32_ROBOTDELTA/Middlewares/** linguist-vendored
+STM32_ROBOTDELTA/USB_DEVICE/** linguist-vendored

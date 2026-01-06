@@ -33,7 +33,9 @@ Xem hệ thống hoạt động thực tế tại đây:
     *   **Direct Send:** Cho các chuyển động ngắn (dọc/Z-axis) để tối đa hóa tốc độ đáp ứng.
 *   **Hiệu năng cao:**
     *   **JIT Warmup:** Tối ưu hóa khởi động Numba, loại bỏ giật lag trong lần chạy đầu tiên.
-    *   **Strict Camera Handling:** Cơ chế kiểm soát Camera chặt chẽ (MSMF backend), tự động chặn Webcam laptop và ưu tiên Camera công nghiệp.
+    *   **Advanced Motion Control (DDS & Sliding Window):**
+    *   **Sliding Window Protocol:** Giao thức truyền thông nạp trước (Look-ahead), cho phép robot thực thi chuỗi quỹ đạo phức tạp mà không bị gián đoạn.
+    *   **DDS (Direct Digital Synthesis):** Thuật toán tạo xung bước siêu chính xác trên STM32, giúp động cơ vận hành êm ái và loại bỏ sai số tích lũy.
 *   **Chế độ hoạt động:**
     *   **Auto Mode:** Tự động hoàn toàn, phân loại theo lớp đối tượng.
     *   **Manual Mode:** Giao diện điều khiển Jogging, kiểm tra IO, Home robot.
