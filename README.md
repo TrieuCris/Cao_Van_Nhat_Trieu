@@ -13,6 +13,12 @@ Dự án bao gồm hai thành phần chính:
 1.  **PC Controller (High-Level):** Chạy thuật toán AI, xử lý ảnh, lập kế hoạch quỹ đạo và giao diện người dùng (GUI).
 2.  **Robot Controller (Low-Level):** Vi điều khiển STM32 điều khiển động cơ bước, bơm hút và xử lý tín hiệu cảm biến.
 
+## 🎥 Demo Video
+
+Xem hệ thống hoạt động thực tế tại đây:
+
+[![Xem Video Demo](https://img.youtube.com/vi/aaXNv4fIjs0/0.jpg)](https://youtu.be/aaXNv4fIjs0)
+
 ## 🚀 Tính Năng Nổi Bật
 
 *   **Nhận diện đối tượng:** Sử dụng mô hình **YOLOv8-OBB** (Oriented Bounding Box) để phát hiện vị trí và góc xoay của vật thể (ví dụ: trái cây, bánh).
