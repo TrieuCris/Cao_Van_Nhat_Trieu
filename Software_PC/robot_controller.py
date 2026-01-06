@@ -333,15 +333,11 @@ class RobotController(QObject):
                     if self.available_slots > self.MAX_QUEUE_SIZE:
                          self.available_slots = self.MAX_QUEUE_SIZE
                 
-                # Log chi tiết với source
-                ids_with_source = [f"{bid}[{src}]" for bid, _, src in timed_out_blocks[:5]]
-                ages = [f"{bid}({age:.1f}s)" for bid, age, _ in timed_out_blocks[:5]]
-                
-                msg = f"⚠️ CLEANUP: Xóa {len(timed_out_blocks)} blocks timeout: {', '.join(ages)} (Slots reclaimed)"
-                self.app.after(0, lambda m=msg: self.app.log_message(m, "warning"))
-                
-                # ✅ DEBUG: Print ra console để phân tích (với source)
-                # print(f"[TIMEOUT CLEANUP] {len(timed_out_blocks)} blocks: {ids_with_source}")
+                # ✅ REMOVED: Không log nữa để tránh spam
+                # ids_with_source = [f"{bid}[{src}]" for bid, _, src in timed_out_blocks[:5]]
+                # ages = [f"{bid}({age:.1f}s)" for bid, age, _ in timed_out_blocks[:5]]
+                # msg = f"⚠️ CLEANUP: Xóa {len(timed_out_blocks)} blocks timeout: {', '.join(ages)} (Slots reclaimed)"
+                # self.app.after(0, lambda m=msg: self.app.log_message(m, "warning"))
         
         return [bid for bid, _, _ in timed_out_blocks]
     
