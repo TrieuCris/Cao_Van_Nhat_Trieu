@@ -1,6 +1,0 @@
-{
-    "recommendations": [
-        "anthropic.claude-code",
-        "stmicroelectronics.stm32cube-ide-build-cmake"
-    ]
-}

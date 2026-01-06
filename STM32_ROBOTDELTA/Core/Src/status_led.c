@@ -1,4 +1,6 @@
 #include "status_led.h"
+#include "robot_control.h"
+#include "button_handler.h"
 #include "stm32f1xx_hal.h"
 
 // Biến trạng thái LED
@@ -86,6 +88,44 @@ void status_led_update(void)
             
         default:
             status_led_set_status(LED_STATUS_IDLE);
+            break;
+    }
+}
+
+void robot_update_status_leds(void)
+{
+    // ✅ PRIORITY 1: E-STOP → Đèn đỏ chớp chậm (1000ms)
+    if (estop_is_triggered()) {
+        if (current_status != LED_STATUS_ESTOP) {
+            status_led_set_status(LED_STATUS_ESTOP);
+        }
+        return;
+    }
+    
+    // ✅ PRIORITY 2: Dựa trên trạng thái robot
+    RobotState robot_state = robot_get_state();
+    
+    switch (robot_state) {
+        case ROBOT_STATE_IDLE:
+            // Idle: Đèn xanh sáng tĩnh
+            if (current_status != LED_STATUS_IDLE) {
+                status_led_set_status(LED_STATUS_IDLE);
+            }
+            break;
+            
+        case ROBOT_STATE_MOVING:
+        case ROBOT_STATE_HOMING:
+            // Đang hoạt động: Đèn xanh chớp (500ms)
+            if (current_status != LED_STATUS_RUNNING) {
+                status_led_set_status(LED_STATUS_RUNNING);
+            }
+            break;
+            
+        default:
+            // Fallback: Idle
+            if (current_status != LED_STATUS_IDLE) {
+                status_led_set_status(LED_STATUS_IDLE);
+            }
             break;
     }
 }

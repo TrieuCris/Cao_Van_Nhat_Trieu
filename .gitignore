@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.mp4
+Yolov8 train/
+.vscode/
+*.docx
+*.pdf
+desktop.ini
+*.tmp
+*.log

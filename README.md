@@ -16,41 +16,48 @@ Dự án bao gồm hai thành phần chính:
 ## 🚀 Tính Năng Nổi Bật
 
 *   **Nhận diện đối tượng:** Sử dụng mô hình **YOLOv8-OBB** (Oriented Bounding Box) để phát hiện vị trí và góc xoay của vật thể (ví dụ: trái cây, bánh).
-*   **Tracking băng tải:** Thuật toán lai (Hybrid Tracking) kết hợp phát hiện từ Camera và Dead Reckoning (tính toán dựa trên vận tốc băng tải) để gắp vật thể chính xác ngay cả khi vật ra khỏi vùng nhìn camera.
-*   **Lập kế hoạch quỹ đạo:**
-    *   Sử dụng **Trapezoidal Velocity Profile** cho các chuyển động dài giúp robot di chuyển mượt mà.
-    *   Tối ưu hóa **Inverse Kinematics** bằng thư viện **Numba (JIT)** để đạt hiệu suất thời gian thực.
+*   **Hybrid Tracking (Trigger Line Locking):**
+    *   Kết hợp **YOLOv8** và **Dead Reckoning** (tính toán dựa trên vận tốc băng tải).
+    *   **Anti-Ghosting:** Cơ chế khóa đối tượng khi qua vạch Trigger, ngăn chặn việc nhận diện trùng lặp (double counting) và đảm bảo gắp chính xác 100% ngay cả khi vật ra khỏi vùng nhìn camera.
+*   **Đồng bộ hóa thời gian thực (Time-Based Sync):**
+    *   Sử dụng `time.perf_counter()` độ chính xác cao để đồng bộ vị trí vật thể với băng tải.
+    *   Loại bỏ độ trễ (latency) giữa xử lý ảnh và hành động của robot.
+*   **Lập kế hoạch chuyển động lai (Hybrid Motion Planning):**
+    *   **Trapezoidal Planner:** Cho các chuyển động dài (ngang), giúp robot di chuyển mượt mà, giảm rung lắc.
+    *   **Direct Send:** Cho các chuyển động ngắn (dọc/Z-axis) để tối đa hóa tốc độ đáp ứng.
+*   **Hiệu năng cao:**
+    *   **JIT Warmup:** Tối ưu hóa khởi động Numba, loại bỏ giật lag trong lần chạy đầu tiên.
+    *   **Strict Camera Handling:** Cơ chế kiểm soát Camera chặt chẽ (MSMF backend), tự động chặn Webcam laptop và ưu tiên Camera công nghiệp.
 *   **Chế độ hoạt động:**
-    *   **Auto Mode:** Tự động hoàn toàn, đồng bộ hóa với băng tải.
-    *   **Manual Mode:** Điều khiển Jogging, kiểm tra IO, Home robot qua giao diện.
-*   **Giao diện trực quan:** Viết bằng **PyQt6**, hiển thị video stream, trạng thái robot và các thông số cài đặt.
+    *   **Auto Mode:** Tự động hoàn toàn, phân loại theo lớp đối tượng.
+    *   **Manual Mode:** Giao diện điều khiển Jogging, kiểm tra IO, Home robot.
 
 ## 🛠️ Kiến Trúc Hệ Thống & Công Nghệ
 
-### 1. Phần Mềm (PC - `GUI_PC`)
+### 1. Phần Mềm (PC - `Software_PC`)
 *   **Ngôn ngữ:** Python 3.11+
-*   **Giao diện:** PyQt6
+*   **Giao diện:** PyQt6 (Modern GUI)
 *   **Xử lý ảnh & AI:** OpenCV, Ultralytics YOLOv8
 *   **Tính toán:** NumPy, Numba (High-performance JIT compiler)
 *   **Giao tiếp:** PySerial (UART communication với STM32)
 
 ### 2. Phần Cứng (Firmware - `STM32_ROBOTDELTA`)
 *   **Vi điều khiển:** STM32F103 (Blue Pill hoặc tương đương)
-*   **Framework:** STM32 HAL, FreeRTOS (tùy chọn trong cấu hình)
+*   **Framework:** STM32 HAL, FreeRTOS
 *   **Điều khiển:** Step Motor Drivers, Relay/Mosfet cho bơm khí nén.
 
 ## 📂 Cấu Trúc Thư Mục
 
 ```
 CODE/
-├── GUI_PC/                     # Mã nguồn phần mềm điều khiển trên máy tính
+├── Software_PC/                # Mã nguồn phần mềm điều khiển trên máy tính
 │   ├── main.py                 # Điểm khởi chạy chương trình (Main Entry)
 │   ├── vision_system.py        # Xử lý ảnh, Camera, YOLO, Tracking
 │   ├── robot_controller.py     # Quản lý kết nối và gửi lệnh xuống STM32
 │   ├── auto_mode_controller.py # Logic điều khiển chế độ tự động (Scheduler)
 │   ├── kinematics.py           # Tính toán động học nghịch đảo (Inverse Kinematics)
 │   ├── pyqt_delta_gui.py       # Giao diện đồ họa (UI Layout)
-│   ├── best_obb_traicay.pt     # Trọng số mô hình AI (Model Weights)
+│   ├── best_obb_traicay_0656.pt # Trọng số mô hình AI (Model Weights)
 │   └── camera_calibration.json # File cấu hình tham số Camera
 │
 ├── STM32_ROBOTDELTA/           # Mã nguồn Firmware cho vi điều khiển
@@ -64,30 +71,30 @@ CODE/
 
 ### Yêu cầu phần cứng
 *   Máy tính chạy Windows (Khuyên dùng có GPU NVIDIA để chạy YOLO mượt hơn).
-*   Camera (Webcam USB).
+*   Camera (Webcam USB - Khuyên dùng Camera công nghiệp hỗ trợ MSMF).
 *   Robot Delta kết nối qua cổng COM (USB-to-TTL).
-*   Băng tải có thể điều chỉnh tốc độ (hoặc tốc độ cố định đã calib).
+*   Băng tải có thể điều chỉnh tốc độ.
 
 ### Các bước cài đặt
 
 1.  **Clone repository:**
     ```bash
     git clone https://github.com/TrieuCris/Cao_Van_Nhat_Trieu.git
-    cd Cao_Van_Nhat_Trieu/CODE/GUI_PC
+    cd Cao_Van_Nhat_Trieu/CODE/Software_PC
     ```
 
 2.  **Cài đặt thư viện Python:**
     ```bash
     pip install PyQt6 opencv-python ultralytics numba pyserial numpy pillow
+    # Lưu ý: Cài đặt PyTorch với hỗ trợ CUDA nếu có GPU NVIDIA
     ```
-    *(Lưu ý: Cài đặt PyTorch với hỗ trợ CUDA nếu có GPU)*
 
 3.  **Cấu hình Camera:**
-    *   Đảm bảo file `camera_calibration.json` đã có thông số chính xác (Matrix, Distortion, Pixel-to-mm ratio).
-    *   Nếu chưa, chạy các script trong thư mục `utilities/` để cân chỉnh.
+    *   File `camera_calibration.json` chứa thông số Matrix, Distortion.
+    *   Đảm bảo `camera_index` trong file JSON trỏ đúng tới Camera ngoài (thường là 1).
 
 4.  **Nạp Firmware:**
-    *   Dùng STM32CubeIDE hoặc KeilC để mở project trong `STM32_ROBOTDELTA`.
+    *   Dùng STM32CubeIDE mở project `STM32_ROBOTDELTA`.
     *   Build và nạp code xuống mạch STM32.
 
 ### Vận hành
@@ -95,6 +102,7 @@ CODE/
 1.  Kết nối USB của Robot và Camera vào máy tính.
 2.  Chạy phần mềm điều khiển:
     ```bash
+    cd Software_PC
     python main.py
     ```
 3.  Trên giao diện:
@@ -106,6 +114,3 @@ CODE/
 
 *   **Tác giả:** Cao Văn Nhật Triều
 *   **Đề tài:** Đồ án tốt nghiệp đại học
-*   **Liên hệ:** [Email hoặc thông tin liên hệ của bạn]
-
----

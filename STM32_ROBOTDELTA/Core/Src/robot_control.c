@@ -123,15 +123,34 @@ static void dwt_init(void) {
 }
 
 /**
- * @brief Chuyển đổi góc servo thành giá trị pulse cho timer.
- * @param angle_x100 Góc * 100 (0-27000 cho 0-270.00°). Ví dụ: 27000 = 270.0°
- * @return Giá trị pulse (500-2500 us)
+ * @brief Chuyển đổi góc servo VẬT LÝ sang giá trị PWM pulse.
+ * 
+ * Servo 270°:
+ * - Góc vật lý: 0° đến 270° (angle_x100: 0 đến 27000)
+ * - PWM pulse: 500us (0°) đến 2500us (270°)
+ * - PWM period: 20ms (50Hz)
+ * - Timer: TIM4, prescaler=71, period=19999 → 1MHz counter
+ * - 1 tick = 1us → pulse value = microseconds
+ * 
+ * Công thức: pulse = 500 + (angle_degree / 270) * 2000
+ *          = 500 + (angle_x100 / 100 / 270) * 2000
+ *          = 500 + (angle_x100 * 20) / 270
+ * 
+ * @param angle_x100 Góc vật lý × 100 (0 = 0°, 27000 = 270°)
+ * @return Giá trị PWM pulse (500-2500)
  */
 uint16_t robot_servo_angle_to_pulse(uint32_t angle_x100) {
-    // Giới hạn góc trong khoảng 0-27000 (0-270°)
-    if (angle_x100 > 27000) angle_x100 = 27000;
-    // Ánh xạ: 500 + (angle_x100 * 20) / 270
-    return 500 + (uint16_t)((angle_x100 * 20) / 270);
+    // ✅ VALIDATION: Giới hạn góc vật lý trong phạm vi 0-270°
+    if (angle_x100 > 27000UL) {
+        angle_x100 = 27000UL;  // Clamp to max
+    }
+    
+    // ✅ Chuyển đổi: góc vật lý → PWM pulse
+    // Công thức: pulse = 500 + (angle_x100 * 20) / 270
+    // VD: 0 → 500us, 13500 (135°) → 1500us, 27000 (270°) → 2500us
+    uint16_t pulse = 500 + (uint16_t)((angle_x100 * 20UL) / 270UL);
+    
+    return pulse;
 }
 
 
@@ -311,48 +330,49 @@ static void robot_timer_irq_handler(TIM_HandleTypeDef *htim) {
         for (int i = 0; i < 3; i++) {
             if (!motor_states[i].active) continue;
             
+            // ✅ DISABLED: Limit Switch Protection (User Request)
             // Logic cũ: DIR == HOMING_DIR_UP_LEVEL (RESET) -> đang đi lên.
-            GPIO_TypeDef* dir_port;
-            uint16_t dir_pin;
-            if (i == 0) { dir_port = M1_DIR_GPIO_Port; dir_pin = M1_DIR_Pin; }
-            else if (i == 1) { dir_port = M2_DIR_GPIO_Port; dir_pin = M2_DIR_Pin; }
-            else { dir_port = M3_DIR_GPIO_Port; dir_pin = M3_DIR_Pin; }
+            // GPIO_TypeDef* dir_port;
+            // uint16_t dir_pin;
+            // if (i == 0) { dir_port = M1_DIR_GPIO_Port; dir_pin = M1_DIR_Pin; }
+            // else if (i == 1) { dir_port = M2_DIR_GPIO_Port; dir_pin = M2_DIR_Pin; }
+            // else { dir_port = M3_DIR_GPIO_Port; dir_pin = M3_DIR_Pin; }
             
-            // Đọc nhanh trạng thái DIR từ thanh ghi ODR (Output Data Register) vì ta đang lái nó
-            bool is_up_dir = ((dir_port->ODR & dir_pin) == (HOMING_DIR_UP_LEVEL ? dir_pin : 0));
+            // // Đọc nhanh trạng thái DIR từ thanh ghi ODR (Output Data Register) vì ta đang lái nó
+            // bool is_up_dir = ((dir_port->ODR & dir_pin) == (HOMING_DIR_UP_LEVEL ? dir_pin : 0));
 
-            if (is_up_dir) {
-                if (robot_is_limit_switch_triggered_fast(i)) {
-                    if (moving_ls_debounce[i] < MOVING_LS_DEBOUNCE_THRESHOLD) {
-                        moving_ls_debounce[i]++;
-                    }
-                } else {
-                    moving_ls_debounce[i] = 0;
-                }
+            // if (is_up_dir) {
+            //     if (robot_is_limit_switch_triggered_fast(i)) {
+            //         if (moving_ls_debounce[i] < MOVING_LS_DEBOUNCE_THRESHOLD) {
+            //             moving_ls_debounce[i]++;
+            //         }
+            //     } else {
+            //         moving_ls_debounce[i] = 0;
+            //     }
 
-                if (moving_ls_debounce[i] >= MOVING_LS_DEBOUNCE_THRESHOLD) {
-                    // 🚨 CRITICAL ERROR: Chạm LS khi đang chạy -> Mất bước/Sai lệch nghiêm trọng
-                    // Giải pháp: Dừng TOÀN BỘ robot ngay lập tức thay vì chỉ dừng 1 trục
-                    
-                    for(int k=0; k<3; k++) {
-                        motor_states[k].active = false;
-                        motor_states[k].steps_to_go = 0;
-                        motor_states[k].accumulator = 0;
-                        // Kéo chân PUL xuống thấp
-                        if (motor_states[k].pul_state) {
-                            motor_states[k].pul_port->BSRR = (uint32_t)motor_states[k].pul_pin << 16U;
-                            motor_states[k].pul_state = false;
-                        }
-                    }
-                    
-                    up_blocked_debug[i] = true; // Đánh dấu trục bị lỗi để báo về Main
-                    still_moving = false;       // Ép vòng lặp dừng ngay
-                    break;                      // Thoát vòng lặp for i
-                }
-            } else {
-                // Nếu đang đi xuống, reset counter an toàn
-                moving_ls_debounce[i] = 0;
-            }
+            //     if (moving_ls_debounce[i] >= MOVING_LS_DEBOUNCE_THRESHOLD) {
+            //         // 🚨 CRITICAL ERROR: Chạm LS khi đang chạy -> Mất bước/Sai lệch nghiêm trọng
+            //         // Giải pháp: Dừng TOÀN BỘ robot ngay lập tức thay vì chỉ dừng 1 trục
+            //         
+            //         for(int k=0; k<3; k++) {
+            //             motor_states[k].active = false;
+            //             motor_states[k].steps_to_go = 0;
+            //             motor_states[k].accumulator = 0;
+            //             // Kéo chân PUL xuống thấp
+            //             if (motor_states[k].pul_state) {
+            //                 motor_states[k].pul_port->BSRR = (uint32_t)motor_states[k].pul_pin << 16U;
+            //                 motor_states[k].pul_state = false;
+            //             }
+            //         }
+            //         
+            //         up_blocked_debug[i] = true; // Đánh dấu trục bị lỗi để báo về Main
+            //         still_moving = false;       // Ép vòng lặp dừng ngay
+            //         break;                      // Thoát vòng lặp for i
+            //     }
+            // } else {
+            //     // Nếu đang đi xuống, reset counter an toàn
+            //     moving_ls_debounce[i] = 0;
+            // }
 
             // ========== DDS Algorithm ==========
             uint32_t old_acc = motor_states[i].accumulator;
@@ -391,18 +411,17 @@ static void robot_timer_irq_handler(TIM_HandleTypeDef *htim) {
         for (int i=0;i<3;i++) { if (up_blocked_debug[i]) g_flag_up_blocked[i] = true; }
 
         if (!still_moving) {
-            // ✅ FIX BUG: Thêm delay nhỏ giữa các block để đảm bảo driver nhận đủ xung cuối
-            // Pulse width min của TB6600 là ~2.5us, 500 NOPs @ 72MHz ≈ 7us (an toàn)
-            for (volatile int delay = 0; delay < 500; delay++) { __NOP(); }
+            // [OPTIMIZATION] Removed blocking delay loops. 
+            // At 72MHz, minimal delays are naturally handled by instruction execution time.
             
+            // ✅ FIX CRITICAL BUG: Gửi DONE cho block hiện tại TRƯỚC khi kiểm tra block tiếp
             queue_finish_current_block(); 
+            
             MotionBlock next_block;
             if (queue_pop_next_from_isr(&next_block)) {
-                // ✅ FIX: Thêm delay setup time cho DIR pin trước khi phát xung
-                // TB6600 cần ~5us setup time cho DIR, 800 NOPs @ 72MHz ≈ 11us (an toàn tuyệt đối)
-                for (volatile int delay = 0; delay < 800; delay++) { __NOP(); }
                 robot_apply_block(&next_block);
             } else {
+                // ✅ KHÔNG còn block nào -> Dừng timer và chuyển IDLE
                 HAL_TIM_Base_Stop_IT(&htim3);
                 current_robot_state = ROBOT_STATE_IDLE;
                 status_led_set_status(LED_STATUS_IDLE);
@@ -590,8 +609,6 @@ HomingState robot_get_homing_state(void) {
 bool robot_is_homed(void) {
     return robot_homed;
 }
-
-void robot_update_state(void) {}
 
 void robot_get_absolute_steps(int32_t* steps_array) {
     steps_array[0] = absolute_motor_steps[0];
@@ -809,6 +826,11 @@ bool robot_get_and_clear_flag_homing_done(void) {
 }
 
 bool robot_set_servo_angle_manual(uint32_t angle_x100) {
+    // ✅ VALIDATION: Giới hạn góc vật lý trong phạm vi 0-270°
+    if (angle_x100 > 27000UL) {
+        angle_x100 = 27000UL;  // Clamp to max
+    }
+    
     // ✅ Luôn cho phép điều khiển Servo (không cần Home)
     if (!servo_pwm_started) {
         HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);

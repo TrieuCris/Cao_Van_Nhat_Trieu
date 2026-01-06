@@ -163,7 +163,8 @@ int main(void)
 
     // --- Giám sát cảm biến khay (Tray Sensor) ---
     static int last_tray_state = -1;
-    int current_tray_state = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15) == GPIO_PIN_RESET) ? 1 : 0;
+    // [FIX] Cảm biến khay dùng PULLDOWN: Có khay = VCC (SET) = 1, Mất khay = GND (RESET) = 0
+    int current_tray_state = (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15) == GPIO_PIN_SET) ? 1 : 0;
     
     if (last_tray_state == -1) {
         last_tray_state = current_tray_state;
@@ -188,6 +189,9 @@ int main(void)
         robot_get_and_clear_flag_homing_ls_trig(i);
     }
 
+    // ✅ Tự động cập nhật LED status dựa trên trạng thái robot & E-STOP
+    robot_update_status_leds();
+    
     // Cập nhật LED trạng thái (gọi mỗi vòng lặp để nhấp nháy được smooth)
     status_led_update();
 
@@ -516,10 +520,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB15 (Conveyor Sensor - NPN NO with PULLUP) */
+  /*Configure GPIO pins : PB15 (Conveyor Sensor - NO with PULLDOWN) */
   GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB6, PB7 (START and STOP buttons - NO with VCC) */
@@ -557,28 +561,19 @@ static void MX_GPIO_Init(void)
  */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    // ✅ XỬ LÝ NGAY TRONG NGẮT (Hard Real-time Safety)
-    // Lý do bảo vệ đồ án: Để đảm bảo an toàn tối đa, tín hiệu dừng khẩn cấp được xử lý 
-    // ngay lập tức trong ngắt ngoại vi khi NÚT ĐƯỢC NHẤN.
-    
+    // ✅ FIX: Vô hiệu hóa xử lý trong ngắt để tránh nhiễu động cơ kích hoạt E-Stop giả.
+    // Việc xử lý E-Stop đã được đảm nhiệm an toàn bởi button_handler_update() với debounce 10ms.
+    /*
     if (GPIO_Pin == GPIO_PIN_8) // E_STOP_Pin (PA8)
     {
-        // Kiểm tra trạng thái vật lý của chân PA8
-        // NC (Thường đóng) + PullUp:
-        // - Bình thường (Đóng): Nối GND -> Mức 0 (LOW)
-        // - Nhấn E-Stop (Mở): Ngắt GND, PullUp kéo lên -> Mức 1 (HIGH)
-        
         if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) == GPIO_PIN_SET) 
         {
-            // --- TRƯỜNG HỢP 1: NÚT VỪA ĐƯỢC NHẤN (RISING) ---
-            // Ưu tiên cao nhất: Ngắt toàn bộ xung động cơ và dừng băng tải NGAY LẬP TỨC
             robot_estop_triggered(); 
-            
-            // Gửi cảnh báo lên PC ngay lập tức để giao diện cập nhật
             send_status_report();
         }
-        // Trường hợp NHẢ (Falling) để cho Main Loop xử lý qua cơ chế Polling debounce
     }
+    */
+    (void)GPIO_Pin;
 }
 
 /* USER CODE END 4 */

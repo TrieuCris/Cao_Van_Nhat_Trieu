@@ -104,10 +104,11 @@ uint16_t robot_servo_angle_to_pulse(uint32_t angle_x100);
 bool robot_is_homed(void);
 
 /**
- * @brief Điều khiển servo thủ công (chỉ hoạt động khi đã home).
- * @param angle_x100 Góc * 100 (0-27000 = 0-270°).
- * @return true nếu thành công, false nếu chưa home.
+ * @brief Điều khiển servo thủ công (✅ Luôn cho phép - không cần home).
+ * @param angle_x100 Góc VẬT LÝ * 100 (0-27000 = 0-270°).
+ * @return true nếu thành công.
  */
+bool robot_set_servo_angle_manual(uint32_t angle_x100);
 bool robot_set_servo_angle_manual(uint32_t angle_x100);
 
 // --- Get-and-clear flag functions for main loop ---

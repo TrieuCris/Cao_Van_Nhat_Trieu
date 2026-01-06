@@ -1,0 +1,42 @@
+=== SESSION STARTED: 2026-01-06 16:01:16 ===
+[16:01:16] [INFO] 🎯 MOVE luôn sử dụng Trapezoidal Motion Planner
+[16:01:19] [INFO] ✅ Đã load camera calibration config
+[16:01:19] [INFO] ✅ Trigger (Vertical): Robot Y=-240.0 -> Img X=858
+[16:01:19] [INFO] Camera feed started (threaded).
+[16:01:20] [SENT] Đang kết nối tới COM3...
+[16:01:22] [RECEIVED] ✓ Kết nối COM3 (phản hồi PONG)
+[16:01:22] [RECEIVED] ✓ Kết nối thành công (phản hồi PONG)
+[16:01:22] [RECEIVED] PONG
+[16:01:22] [INFO] ✅ Đồng bộ: Robot đã HOME
+[16:01:22] [INFO] ✅ Đã nhận khay hứng
+[16:01:23] [INFO] ✅ Chế độ MANUAL đã được BẬT
+[16:01:24] [SENT] 🏠 Bắt đầu homing...
+[16:01:24] [SENT] 🏠 HOME bắt đầu...
+[16:01:24] [SENT] 🔧 Servo: Set Coord -90.0°
+[16:01:24] [RECEIVED] ACK:FLUSH nhận được - Queue cleared.
+[16:01:24] [SENT] ✅ ACK:FLUSH OK -> Gửi lệnh HOME ngay!
+[16:01:24] [SENT] 📤 Gửi lệnh HOME đến STM32...
+[16:01:24] [RECEIVED] ✅ Lệnh HOME đã được gửi tới STM32
+[16:01:24] [INFO] ⏳ Chờ STM32 phản hồi HOME_DONE... (timeout 15s)
+[16:01:24] [INFO] ⚠️ Đồng bộ: Mất HOME
+[16:01:24] [RECEIVED] ✅ HOME hoàn thành - Robot đã về vị trí gốc
+[16:01:24] [INFO] 🏠 Home position: X=0.00, Y=-15.00, Z=-250.49
+[16:01:24] [RECEIVED] HOME_DONE
+[16:01:24] [INFO] ✅ Đồng bộ: Robot đã HOME
+[16:01:25] [INFO] ℹ️ Chế độ MANUAL đã được TẮT
+[16:01:31] [INFO] 🔴 Nút START cứng đã nhấn
+[16:01:31] [SENT] 🚀 BẮT ĐẦU AUTO (TIME-BASED): Về vị trí chờ...
+[16:01:31] [INFO] 📍 Vị trí hiện tại: (0.0, -15.0, -250.5)
+[16:01:31] [SENT] 🎯 MOVE đến (0.0, -15.0, -390.0) - 139.5mm
+[16:01:31] [SENT] ⏩ Conveyor: Tiến
+[16:01:32] [WARNING] ⚠️ Sync: STM32 đã xong nhưng mất DONE -> Force IDLE
+[16:01:46] [INFO] 🟢 Nút STOP cứng đã nhấn
+[16:01:46] [SENT] 🛑 AUTO STOP REQUESTED
+[16:01:46] [SENT] ⏸️ Conveyor: Dừng
+[16:01:46] [SENT] 🔧 Servo: Set Coord -90.0°
+[16:01:46] [INFO] ℹ️ STOP: Đã dừng Auto, đồng bộ vị trí từ STM32...
+[16:01:46] [RECEIVED] ACK:FLUSH nhận được - Queue cleared.
+[16:01:46] [WARNING] ⚠️ Đã dừng & Reset Home
+[16:01:46] [INFO] ⚠️ Đồng bộ: Mất HOME
+[16:01:50] [INFO] 🔴 Nút START cứng đã nhấn
+[16:01:50] [ERROR] ❌ Nút cứng: Robot chưa HOME!

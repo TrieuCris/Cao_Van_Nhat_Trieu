@@ -35,4 +35,10 @@ void status_led_update(void);
  */
 LEDStatus status_led_get_current_status(void);
 
+/**
+ * @brief Tự động cập nhật LED status dựa trên trạng thái robot và E-STOP
+ * @note Gọi trong main loop để STM32 tự quản lý đèn xanh/đỏ
+ */
+void robot_update_status_leds(void);
+
 #endif // __STATUS_LED_H
