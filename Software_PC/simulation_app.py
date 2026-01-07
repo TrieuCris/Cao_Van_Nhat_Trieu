@@ -3,7 +3,8 @@ import time
 import math
 import numpy as np
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QLabel, QGroupBox, QGridLayout, QDoubleSpinBox)
+                             QHBoxLayout, QPushButton, QLabel, QGroupBox, QGridLayout, QDoubleSpinBox,
+                             QSlider, QButtonGroup, QRadioButton)
 from PyQt6.QtCore import QTimer, Qt
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
@@ -195,6 +196,20 @@ class DeltaRobotVisualizer(gl.GLViewWidget):
             line = gl.GLLinePlotItem(width=2, color=(0, 1, 1, 1)) # Xanh Cyan
             self.addItem(line)
             self.forearm_lines.append(line)
+
+        # 4. End Effector (Suction Cup) - ĐẦU HÚT
+        # Tạo hình trụ: radius=[trên, dưới], length=40mm
+        md_cup = gl.MeshData.cylinder(rows=10, cols=20, radius=[6, 12], length=40)
+        self.suction_cup = gl.GLMeshItem(meshdata=md_cup, smooth=True, color=(1, 1, 0, 1), shader='balloon')
+        self.addItem(self.suction_cup)
+        
+        # [NEW] Chỉ báo hướng xoay (Servo Indicator) - Một thanh ngang màu đỏ
+        self.servo_indicator = gl.GLBoxItem(size=pg.Vector(30, 4, 4), color=(1, 0, 0, 1))
+        # Dời tâm box về giữa để xoay cho đẹp (mặc định box vẽ từ góc 0,0,0)
+        self.servo_indicator.translate(-15, -2, 0) 
+        self.addItem(self.servo_indicator)
+        
+        self.servo_angle = 0 # [NEW] Lưu góc xoay hiện tại
             
         self.update_robot_pose(0, 0, 0) # Vị trí ban đầu
 
@@ -239,6 +254,23 @@ class DeltaRobotVisualizer(gl.GLViewWidget):
             for i in range(3):
                 self.forearm_lines[i].setData(pos=np.array([J[i], plat_pts_new[i]]))
 
+            # Cập nhật vị trí đầu hút
+            cup_len = 40
+            self.suction_cup.resetTransform()
+            
+            # 1. Xoay quanh trục Z (tại gốc của chính nó) -> Xoay tại chỗ
+            self.suction_cup.rotate(self.servo_angle, 0, 0, 1) 
+            
+            # 2. Dời về vị trí lệch tâm (so với tâm bàn kẹp)
+            self.suction_cup.translate(0, -15.0, 0)
+            
+            # 3. Dời đến vị trí bàn kẹp trong không gian
+            self.suction_cup.translate(x, y, z - cup_len)
+
+    def set_suction_color(self, color):
+        """Đổi màu đầu hút: color = (r, g, b, a)"""
+        self.suction_cup.setColor(color)
+
 
 class DeltaSimulationApp(QMainWindow):
     def __init__(self):
@@ -256,7 +288,6 @@ class DeltaSimulationApp(QMainWindow):
         self.current_angles = [val, val, val]
         
         # [FIX] Tính toán tọa độ khởi đầu chính xác từ góc Home để đồng bộ
-        # Dùng forward_kinematics_tool để lấy tọa độ ĐẦU HÚT, khớp với Planner
         coords = self.kinematics.forward_kinematics_tool(*self.current_angles, alpha_deg=-90.0)
         if coords:
             self.current_coords = list(coords)
@@ -265,7 +296,7 @@ class DeltaSimulationApp(QMainWindow):
             
         self.prev_coords = list(self.current_coords)
         self.prev_velocity = [0.0, 0.0, 0.0] 
-        self.filtered_torque = [0.0, 0.0, 0.0] # [NEW] Biến lưu giá trị đã lọc
+        self.filtered_torque = [0.0, 0.0, 0.0] 
         
         # Simulation Loop
         self.timer = QTimer()
@@ -295,58 +326,14 @@ class DeltaSimulationApp(QMainWindow):
         self.viz = DeltaRobotVisualizer(self.kinematics)
         left_layout.addWidget(self.viz, stretch=2)
         
-        control_group = QGroupBox("Điều khiển & Vật lý")
-        control_layout = QGridLayout()
+        # [UPDATE] Gộp thành 1 panel duy nhất
+        self.panel_control = QWidget()
+        self.init_compact_control_panel()
+        left_layout.addWidget(self.panel_control)
         
-        self.btn_home = QPushButton("HOME")
-        self.btn_home.clicked.connect(self.cmd_home)
-        control_layout.addWidget(self.btn_home, 0, 0, 1, 2)
-        
-        self.btn_random = QPushButton("Random Move")
-        self.btn_random.clicked.connect(self.cmd_move_random)
-        control_layout.addWidget(self.btn_random, 0, 2, 1, 2)
-
-        # Manual Input
-        control_layout.addWidget(QLabel("X:"), 1, 0)
-        self.spin_x = QDoubleSpinBox()
-        self.spin_x.setRange(-200, 200); self.spin_x.setValue(0)
-        control_layout.addWidget(self.spin_x, 1, 1)
-
-        control_layout.addWidget(QLabel("Y:"), 1, 2)
-        self.spin_y = QDoubleSpinBox()
-        self.spin_y.setRange(-200, 200); self.spin_y.setValue(0)
-        control_layout.addWidget(self.spin_y, 1, 3)
-
-        control_layout.addWidget(QLabel("Z:"), 2, 0)
-        self.spin_z = QDoubleSpinBox()
-        self.spin_z.setRange(-500, -200); self.spin_z.setValue(-350)
-        control_layout.addWidget(self.spin_z, 2, 1)
-
-        self.btn_move = QPushButton("Move To")
-        self.btn_move.clicked.connect(self.cmd_move_target)
-        control_layout.addWidget(self.btn_move, 2, 2, 1, 2)
-
-        # Payload Config
-        control_layout.addWidget(QLabel("Payload (kg):"), 3, 0)
-        self.spin_payload = QDoubleSpinBox()
-        self.spin_payload.setRange(0, 10); self.spin_payload.setValue(0.5); self.spin_payload.setSingleStep(0.1)
-        self.spin_payload.valueChanged.connect(self.update_dynamics_params)
-        control_layout.addWidget(self.spin_payload, 3, 1)
-
-        control_layout.addWidget(QLabel("Arm Mass (kg):"), 3, 2)
-        self.spin_arm_mass = QDoubleSpinBox()
-        self.spin_arm_mass.setRange(0, 5); self.spin_arm_mass.setValue(0.3); self.spin_arm_mass.setSingleStep(0.1)
-        self.spin_arm_mass.valueChanged.connect(self.update_dynamics_params)
-        control_layout.addWidget(self.spin_arm_mass, 3, 3)
-
-        self.lbl_pos = QLabel("Position: X=0 Y=0 Z=0")
-        control_layout.addWidget(self.lbl_pos, 4, 0, 1, 4)
-        
-        control_group.setLayout(control_layout)
-        left_layout.addWidget(control_group)
         layout.addLayout(left_layout, stretch=2)
 
-        # RIGHT PANEL: Graphs (Sử dụng GraphicsLayoutWidget cho lưới đồ thị)
+        # RIGHT PANEL: Graphs
         self.win_plot = pg.GraphicsLayoutWidget(show=True, title="Real-time Monitor")
         layout.addWidget(self.win_plot, stretch=1)
         
@@ -397,6 +384,229 @@ class DeltaSimulationApp(QMainWindow):
         # Khởi động
         self.cmd_home()
         self.timer.start(self.sim_interval_ms)
+        
+        # --- JOG TIMER ---
+        self.jog_timer = QTimer()
+        self.jog_timer.setInterval(30) # 33Hz updates
+        self.jog_timer.timeout.connect(self.jog_timer_callback)
+        self.current_jog_axis = None
+        self.current_jog_sign = 0
+
+    def init_compact_control_panel(self):
+        """Khởi tạo giao diện điều khiển TÍCH HỢP (Compact)"""
+        main_layout = QHBoxLayout()
+        
+        # --- CỘT 1: MANUAL CONTROL (JOG & TOOLS) ---
+        col1 = QVBoxLayout()
+        
+        # 1. JOG CONTROL
+        jog_group = QGroupBox("Điều khiển JOG (Ấn giữ)")
+        grid_jog = QGridLayout()
+        
+        # Helper tạo nút JOG
+        def create_jog_btn(text, axis, sign, color=None):
+            btn = QPushButton(text)
+            btn.setFixedSize(60, 40) # Compact size
+            if color: btn.setStyleSheet(f"background-color: {color}")
+            
+            # [IMPORTANT] Xử lý sự kiện nhấn/nhả thủ công để tránh lag/trôi
+            btn.pressed.connect(lambda: self.start_jog(axis, sign))
+            btn.released.connect(self.stop_jog)
+            return btn
+            
+        # --- BỐ TRÍ LAYOUT JOG CHUẨN (4 Cột x 3 Hàng) ---
+        # Hàng 0: HOME | Y+ | RAND | Z+
+        btn_home = QPushButton("HOME")
+        btn_home.setFixedSize(60, 40)
+        btn_home.setStyleSheet("background-color: #FFA500; font-weight: bold")
+        btn_home.clicked.connect(self.cmd_home)
+        grid_jog.addWidget(btn_home, 0, 0)
+        
+        grid_jog.addWidget(create_jog_btn("Y+", 'y', 1), 0, 1)
+        
+        btn_rand = QPushButton("Rand")
+        btn_rand.setFixedSize(60, 40)
+        btn_rand.clicked.connect(self.cmd_move_random)
+        grid_jog.addWidget(btn_rand, 0, 2)
+        
+        grid_jog.addWidget(create_jog_btn("Z+", 'z', 1, "#ADD8E6"), 0, 3)
+        
+        # Hàng 1: X- | (Trống) | X+ | (Trống)
+        grid_jog.addWidget(create_jog_btn("X-", 'x', -1), 1, 0)
+        grid_jog.addWidget(create_jog_btn("X+", 'x', 1), 1, 2)
+        
+        # Hàng 2: (Trống) | Y- | (Trống) | Z-
+        grid_jog.addWidget(create_jog_btn("Y-", 'y', -1), 2, 1)
+        grid_jog.addWidget(create_jog_btn("Z-", 'z', -1, "#ADD8E6"), 2, 3)
+        
+        jog_group.setLayout(grid_jog)
+        col1.addWidget(jog_group)
+        
+        # 2. STEP SIZE (SPEED)
+        step_group = QGroupBox("Tốc độ JOG")
+        step_layout = QHBoxLayout()
+        self.jog_speed_scale = 1.0 # Hệ số tốc độ
+        
+        step_bg = QButtonGroup(self)
+        # Đổi ý nghĩa: Đây là tốc độ di chuyển mỗi tick (mm/tick)
+        steps = [1, 2, 5, 10] 
+        for val in steps:
+            rb = QRadioButton(f"x{val}")
+            if val == 2: rb.setChecked(True); self.jog_speed_scale = 2.0
+            step_bg.addButton(rb, val)
+            step_layout.addWidget(rb)
+        step_bg.buttonClicked.connect(lambda btn: setattr(self, 'jog_speed_scale', float(step_bg.id(btn))))
+        
+        step_group.setLayout(step_layout)
+        col1.addWidget(step_group)
+        
+        # 3. TOOLS (Pump & Servo)
+        tool_group = QGroupBox("Đầu công tác")
+        tool_layout = QGridLayout()
+        
+        # Pump
+        self.btn_pump = QPushButton("BƠM: TẮT")
+        self.btn_pump.setCheckable(True)
+        self.btn_pump.setStyleSheet("background-color: #FFCCCC")
+        self.btn_pump.clicked.connect(self.toggle_pump)
+        tool_layout.addWidget(self.btn_pump, 0, 0, 1, 2)
+        
+        # Servo
+        tool_layout.addWidget(QLabel("Xoay:"), 1, 0)
+        self.slider_servo = QSlider(Qt.Orientation.Horizontal)
+        self.slider_servo.setRange(-225, 45) # [UPDATE] Range thực tế hệ thống (-225 đến 45)
+        self.slider_servo.setValue(-90) # Default Home Angle
+        self.slider_servo.valueChanged.connect(self.update_servo_visual)
+        tool_layout.addWidget(self.slider_servo, 1, 1)
+        self.lbl_servo = QLabel("0°")
+        tool_layout.addWidget(self.lbl_servo, 1, 2)
+        
+        tool_group.setLayout(tool_layout)
+        col1.addWidget(tool_group)
+        
+        main_layout.addLayout(col1, stretch=1)
+        
+        # --- CỘT 2: CONFIG & INFO ---
+        col2 = QVBoxLayout()
+        
+        # 1. Move To Target
+        move_group = QGroupBox("Di chuyển tọa độ")
+        grid_move = QGridLayout()
+        
+        grid_move.addWidget(QLabel("X:"), 0, 0); self.spin_x = QDoubleSpinBox(); self.spin_x.setRange(-200, 200); grid_move.addWidget(self.spin_x, 0, 1)
+        grid_move.addWidget(QLabel("Y:"), 0, 2); self.spin_y = QDoubleSpinBox(); self.spin_y.setRange(-200, 200); grid_move.addWidget(self.spin_y, 0, 3)
+        grid_move.addWidget(QLabel("Z:"), 1, 0); self.spin_z = QDoubleSpinBox(); self.spin_z.setRange(-500, -200); self.spin_z.setValue(-350); grid_move.addWidget(self.spin_z, 1, 1)
+        
+        btn_go = QPushButton("GO"); btn_go.clicked.connect(self.cmd_move_target)
+        grid_move.addWidget(btn_go, 1, 2, 1, 2)
+        
+        move_group.setLayout(grid_move)
+        col2.addWidget(move_group)
+        
+        # 2. Physics
+        phys_group = QGroupBox("Vật lý & Tải trọng")
+        phys_layout = QGridLayout()
+        phys_layout.addWidget(QLabel("Payload (kg):"), 0, 0)
+        self.spin_payload = QDoubleSpinBox(); self.spin_payload.setRange(0, 10); self.spin_payload.setValue(0.5); self.spin_payload.setSingleStep(0.1)
+        self.spin_payload.valueChanged.connect(self.update_dynamics_params)
+        phys_layout.addWidget(self.spin_payload, 0, 1)
+        
+        phys_layout.addWidget(QLabel("Arm Mass (kg):"), 1, 0)
+        self.spin_arm_mass = QDoubleSpinBox(); self.spin_arm_mass.setRange(0, 5); self.spin_arm_mass.setValue(0.3); self.spin_arm_mass.setSingleStep(0.1)
+        self.spin_arm_mass.valueChanged.connect(self.update_dynamics_params)
+        phys_layout.addWidget(self.spin_arm_mass, 1, 1)
+        phys_group.setLayout(phys_layout)
+        col2.addWidget(phys_group)
+        
+        # 3. Status Info
+        self.lbl_pos = QLabel("POS: X=0 Y=0 Z=0")
+        self.lbl_pos.setStyleSheet("font-size: 10pt; font-weight: bold; color: blue")
+        col2.addWidget(self.lbl_pos)
+        
+        col2.addStretch()
+        main_layout.addLayout(col2, stretch=1)
+        
+        self.panel_control.setLayout(main_layout)
+
+    # --- JOG LOGIC MỚI ---
+    def start_jog(self, axis, sign):
+        """Bắt đầu JOG"""
+        self.current_jog_axis = axis
+        self.current_jog_sign = sign
+        # Xóa queue cũ để bắt đầu JOG ngay lập tức
+        self.trajectory_queue.clear()
+        self.jog_timer.start()
+
+    def stop_jog(self):
+        """Dừng JOG"""
+        self.jog_timer.stop()
+        self.current_jog_axis = None
+        self.current_jog_sign = 0
+        # Xóa queue để dừng ngay lập tức (chống trôi)
+        self.trajectory_queue.clear()
+        
+    def jog_timer_callback(self):
+        """Hàm được gọi liên tục khi giữ nút JOG"""
+        if not self.current_jog_axis: return
+        
+        # Tính toán vị trí mục tiêu TIẾP THEO (ngắn thôi)
+        # Di chuyển mỗi tick (30ms) một đoạn nhỏ
+        step = self.jog_speed_scale # mm/tick
+        
+        cx, cy, cz = self.current_coords
+        tx, ty, tz = cx, cy, cz
+        
+        if self.current_jog_axis == 'x': tx += step * self.current_jog_sign
+        elif self.current_jog_axis == 'y': ty += step * self.current_jog_sign
+        elif self.current_jog_axis == 'z': tz += step * self.current_jog_sign
+        
+        # Kiểm tra giới hạn Workspace đơn giản
+        if tz > -200: tz = -200
+        if tz < -500: tz = -500
+        
+        # Thay vì gọi _plan_move (Trapezoidal), ta tính trực tiếp IK và nhồi vào queue
+        # Điều này tạo ra chuyển động tuyến tính đều (Constant Velocity) -> KHÔNG RUNG
+        
+        alpha = -90.0 # Góc mặc định
+        
+        angles = self.kinematics.inverse_kinematics_tool(tx, ty, tz, alpha)
+        
+        if angles:
+            # Thêm trực tiếp vào queue với thời gian dài hơn Timer (30ms)
+            # t=50ms > interval=30ms => Tạo buffer gối đầu -> Chuyển động mượt, không rung
+            self.trajectory_queue.append({
+                'theta': list(angles),
+                't': 0.050 
+            })
+            
+            # Cập nhật current_coords ảo để lần tick sau tính tiếp từ đây
+            self.current_coords = [tx, ty, tz] # Hack để tick sau cộng dồn tiếp
+        else:
+            print("JOG Limit Reached")
+            self.stop_jog()
+
+    def toggle_pump(self):
+        """Mô phỏng bật/tắt bơm (đổi màu đầu hút)"""
+        is_on = self.btn_pump.isChecked()
+        if is_on:
+            self.btn_pump.setText("BƠM: BẬT")
+            self.btn_pump.setStyleSheet("background-color: #90EE90") # Light Green
+            self.viz.set_suction_color((0, 1, 0, 1)) # Xanh lá
+        else:
+            self.btn_pump.setText("BƠM: TẮT")
+            self.btn_pump.setStyleSheet("background-color: #FFCCCC") # Light Red
+            self.viz.set_suction_color((1, 1, 0, 1)) # Vàng
+
+    def update_servo_visual(self):
+        """Mô phỏng xoay servo (xoay đầu hút)"""
+        angle = self.slider_servo.value()
+        self.lbl_servo.setText(f"{angle}°")
+        
+        # Cập nhật góc cho Visualizer
+        self.viz.servo_angle = angle
+        
+        # Vẽ lại robot (để áp dụng góc xoay mới ngay lập tức)
+        self.viz.update_robot_pose(*self.current_angles)
 
     def update_dynamics_params(self):
         self.dynamics.mass_payload = self.spin_payload.value()
@@ -460,6 +670,7 @@ class DeltaSimulationApp(QMainWindow):
             )
             
             if plan:
+                self.trajectory_queue.clear() # Xóa queue cũ
                 sim_angles = list(self.current_angles)
                 for block in plan:
                     d_steps = block['s']
@@ -486,7 +697,6 @@ class DeltaSimulationApp(QMainWindow):
                 
                 # --- TÍNH TOÁN VẬN TỐC (mm/s) ---
                 # V = Distance / Time_Step
-                # Sử dụng thời gian thực của block từ planner để tính vận tốc chính xác
                 dt_block = point.get('t', self.sim_interval_ms / 1000.0)
                 if dt_block <= 0: dt_block = 0.001
 
@@ -510,19 +720,12 @@ class DeltaSimulationApp(QMainWindow):
                 # --- TÍNH TOÁN MOMENT (TORQUE) ---
                 raw_torques = self.dynamics.compute_torque(self.current_angles, vel_vec, accel_vec)
                 
-                # [NEW] Low Pass Filter (Alpha = 0.1 -> Lấy 10% giá trị mới, 90% giá trị cũ)
-                # Giúp làm mịn đồ thị, loại bỏ gai nhiễu do đạo hàm số
                 alpha = 0.1
                 torques = []
                 for i in range(3):
                     val = (alpha * raw_torques[i]) + ((1 - alpha) * self.filtered_torque[i])
                     torques.append(val)
                 self.filtered_torque = torques
-                
-                # [DEBUG] In vận tốc
-                if velocity > 10.0:
-                    # print(f"Vel: {velocity:.1f} mm/s")
-                    pass
                     
                 self.prev_coords = list(self.current_coords)
                 self.prev_velocity = vel_vec
@@ -567,6 +770,74 @@ class DeltaSimulationApp(QMainWindow):
             self.curve_tau1.setData(self.log_time, self.log_torque1)
             self.curve_tau2.setData(self.log_time, self.log_torque2)
             self.curve_tau3.setData(self.log_time, self.log_torque3)
+            
+            # Cập nhật thông số hiển thị
+            self.spin_x.setValue(self.current_coords[0])
+            self.spin_y.setValue(self.current_coords[1])
+            self.spin_z.setValue(self.current_coords[2])
+
+    # =========================================================================
+    # DIGITAL TWIN INTEGRATION
+    # =========================================================================
+    def start_digital_twin_mode(self):
+        """Chuyển sang chế độ Digital Twin (Nhận dữ liệu từ Main App)"""
+        self.setWindowTitle("Gemini Delta Robot - 3D Digital Twin")
+        
+        # 1. Ẩn bảng điều khiển (Vì điều khiển bằng Main App)
+        self.panel_control.hide()
+        
+        # 2. Dừng Physics Loop nội bộ
+        self.timer.stop()
+        self.jog_timer.stop()
+        
+        # 3. Reset đồ thị
+        self.log_time = []
+        self.start_time_ref = time.time()
+        
+    def update_state_from_external(self, theta, coords, servo_angle=None, pump_state=None):
+        """
+        Hàm nhận dữ liệu từ Robot Controller thật
+        :param theta: List [theta1, theta2, theta3] (Độ)
+        :param coords: List [x, y, z] (mm)
+        :param servo_angle: Góc servo đầu hút (Độ)
+        :param pump_state: Trạng thái bơm (Boolean hoặc 0/1)
+        """
+        # Cập nhật Visualizer 3D
+        self.current_angles = theta
+        self.current_coords = coords
+        
+        if servo_angle is not None:
+            self.viz.servo_angle = servo_angle
+            
+        if pump_state is not None:
+            if pump_state:
+                self.viz.set_suction_color((0, 1, 0, 1)) # Green
+            else:
+                self.viz.set_suction_color((1, 1, 0, 1)) # Yellow
+                
+        self.viz.update_robot_pose(*theta)
+        
+        # Cập nhật Biểu đồ (Logging)
+        now = time.time() - self.start_time_ref
+        
+        self.log_time.append(now)
+        self.log_theta1.append(theta[0])
+        self.log_theta2.append(theta[1])
+        self.log_theta3.append(theta[2])
+        
+        # Limit data
+        limit = 500
+        if len(self.log_time) > limit:
+            self.log_time = self.log_time[-limit:]
+            self.log_theta1 = self.log_theta1[-limit:]
+            self.log_theta2 = self.log_theta2[-limit:]
+            self.log_theta3 = self.log_theta3[-limit:]
+            
+        # Vẽ lại đồ thị
+        self.curve1.setData(self.log_time, self.log_theta1)
+        self.curve2.setData(self.log_time, self.log_theta2)
+        self.curve3.setData(self.log_time, self.log_theta3)
+        # (Tạm bỏ qua Velocity/Torque vì không tính toán real-time physics ở mode này)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
